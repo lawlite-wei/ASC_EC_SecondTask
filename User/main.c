@@ -18,9 +18,13 @@ int16_t Actual_Speed = 0; // 实际用于PID计算的速度
 int16_t Actual_Location = 0; // 实际用于PID计算的速度
 
 // 增量式PID变量
-float Target , Actual , Out ;
-float Kp = 0.5, Ki = 0.16, Kd = 0.5;
-float Error0 = 0, Error1 = 0, Error2 = 0;
+float Target1 , Actual1 , Out1 ;
+float Target2 , Actual2 , Out2 ;
+float Kp1 = 0.5, Ki1 = 0.16, Kd1 = 0.5;
+float Kp2 = 0.4, Ki2 = 0.0, Kd2 = 0.0;
+float Error0_1 = 0, Error1_1 = 0, Error2_1 = 0;
+float Error0_2 = 0, Error1_2 = 0, Error2_2 = 0;
+
 
 int main(void)
 {
@@ -40,8 +44,8 @@ int main(void)
 		//串口发送数据包改变Target的值
 		if(Serial_GetRxFlag() == 1)
 		{
-			Target = Serial_SpeedValue;
-			Serial_Printf("New Target: %d\r\n", (int16_t)Target);
+			Target1 = Serial_SpeedValue;
+			Serial_Printf("New Target: %d\r\n", (int16_t)Target1);
 		}
 		// 按键检测和菜单切换
 		if(Key_Check(KEY_3, KEY_DOWN)) 
@@ -62,16 +66,16 @@ int main(void)
 		// 实时更新OLED显示
 		if(KeyNum == 1)  // 速度菜单
 		{
-			OLED_ShowSignedNum(2, 5, (int16_t)Target, 5);  // 显示目标值
+			OLED_ShowSignedNum(2, 5, (int16_t)Target1, 5);  // 显示目标值
 			OLED_ShowSignedNum(3, 5, Speed1, 5);            // 显示实际速度
-			OLED_ShowSignedNum(4, 5, (int16_t)Out, 5);     // 显示输出
+			OLED_ShowSignedNum(4, 5, (int16_t)Out1, 5);     // 显示输出
+			Serial_Printf("Target:%.1f, Speed:%d, Out:%.1f\r\n", Target1, Speed1, Out1);
 		}
 		else if(KeyNum == 2)  // 位置菜单
 		{
 			OLED_ShowSignedNum(2, 8, Location1, 5);         // 显示位置
+			OLED_ShowSignedNum(3, 8, Location2, 5);
 		}
-		
-		Serial_Printf("Target:%.1f, Speed:%d, Out:%.1f\r\n", Target, Speed1, Out);
 		
 		Delay_ms(50);  // 适当延时
 	}
@@ -98,17 +102,17 @@ void TIM1_UP_IRQHandler(void)
 				Speed1 = Actual_Speed;  // 更新显示用的速度值
 				
 				// PID计算
-				Error2 = Error1;
-				Error1 = Error0;
-				Error0 = Target - Actual_Speed;
+				Error2_1 = Error1_1;
+				Error1_1 = Error0_1;
+				Error0_1 = Target1 - Actual_Speed;
 			
-				Out += Kp * (Error0 - Error1) + Ki * Error0 + Kd * (Error0 - 2 * Error1 + Error2);
+				Out1 += Kp1 * (Error0_1 - Error1_1) + Ki1 * Error0_1 + Kd1 * (Error0_1 - 2 * Error1_1 + Error2_1);
 			
 				// 输出限幅
-				if(Out > 100) Out = 100;
-				if(Out < -100) Out = -100;
+				if(Out1 > 100) Out1 = 100;
+				if(Out1 < -100) Out1 = -100;
 			
-				Motor1_SetPWM(Out);
+				Motor1_SetPWM(Out1);
 			}
 			
 			if(KeyNum == 2)
@@ -116,20 +120,22 @@ void TIM1_UP_IRQHandler(void)
 				//获取电机1的转动位置，并赋值到电机2的Target
 				Speed1 = Encoder1_Get();
 				Location1 += Speed1;
-				Target = Location1;
+				Target2 = Location1;
+				Location2 += Encoder2_Get();
+				Actual_Location = Location2;
 				
 				//PID计算
-				Error2 = Error1;
-				Error1 = Error0;
-				Error0 = Target - Actual_Location;
+				Error2_2 = Error1_2;
+				Error1_2 = Error0_2;
+				Error0_2 = Target2 - Actual_Location;
 				
-				Out += Kp * (Error0 - Error1) + Ki * Error0 + Kd * (Error0 - 2 * Error1 + Error2);
+				Out2 += Kp2 * (Error0_2 - Error1_2) + Ki2 * Error0_2 + Kd2 * (Error0_2 - 2 * Error1_2 + Error2_2);
 				
 				// 输出限幅
-				if(Out > 100) Out = 100;
-				if(Out < -100) Out = -100;
+				if(Out2 > 100) Out2 = 100;
+				if(Out2 < -100) Out2 = -100;
 				
-				Motor2_SetPWM(Out);
+				Motor2_SetPWM(Out2);
 			}
 		}
 		
