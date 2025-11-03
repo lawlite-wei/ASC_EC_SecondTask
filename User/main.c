@@ -1,0 +1,114 @@
+#include "stm32f10x.h"  
+#include "Delay.h"
+#include "OLED.h"
+#include "Key.h"
+#include "menu.h"
+#include "Timer.h"
+#include "PWM.h"
+#include "Motor.h"
+#include "Serial.h"
+#include "Encoder.h"
+
+// 全局变量定义
+uint8_t KeyNum = 1;
+int16_t Speed1 = 0;        // 用于显示的转速
+int16_t Location1 = 0;
+int16_t Location2 = 0;
+int16_t Actual_Speed = 0; // 实际用于PID计算的速度
+
+// 增量式PID变量
+float Target , Actual , Out ;
+float Kp = 0.5, Ki = 0.16, Kd = 0.5;
+float Error0 = 0, Error1 = 0, Error2 = 0;
+
+int main(void)
+{
+	OLED_Init();
+	Key_Init();
+	Timer_Init();
+	Encoder1_Init();
+	Encoder2_Init();
+	Motor_Init();
+	Serial_Init();
+	
+	// 初始显示菜单
+	menu_Speed();
+	
+	while(1)
+	{
+		//串口发送数据包改变Target的值
+		if(Serial_GetRxFlag() == 1)
+		{
+			Target = Serial_SpeedValue;
+			Serial_Printf("New Target: %d\r\n", (int16_t)Target);
+		}
+		// 按键检测和菜单切换
+		if(Key_Check(KEY_3, KEY_DOWN)) 
+		{
+			KeyNum++;
+			if(KeyNum > 2) KeyNum = 1;
+			
+			if(KeyNum == 1)
+			{
+				menu_Speed();
+			}
+			else if(KeyNum == 2)
+			{
+				menu_Location();
+			}
+		}
+		
+		// 实时更新OLED显示
+		if(KeyNum == 1)  // 速度菜单
+		{
+			OLED_ShowSignedNum(2, 5, (int16_t)Target, 5);  // 显示目标值
+			OLED_ShowSignedNum(3, 5, Speed1, 5);            // 显示实际速度
+			OLED_ShowSignedNum(4, 5, (int16_t)Out, 5);     // 显示输出
+		}
+		else if(KeyNum == 2)  // 位置菜单
+		{
+			OLED_ShowSignedNum(2, 8, Location1, 5);         // 显示位置
+		}
+		
+		Serial_Printf("Target:%.1f, Speed:%d, Out:%.1f\r\n", Target, Speed1, Out);
+		
+		Delay_ms(50);  // 适当延时
+	}
+}
+
+// 定时器中断
+void TIM1_UP_IRQHandler(void)
+{
+	static uint16_t Count = 0;
+	
+    if (TIM_GetITStatus(TIM1, TIM_IT_Update) == SET)
+    {
+		Count++;
+		if(Count >= 10)  // 每10次中断执行一次（约10ms）
+		{
+			Count = 0;
+			
+			// 获取编码器值
+			Actual_Speed = Encoder1_Get();
+			Speed1 = Actual_Speed;  // 更新显示用的速度值
+			Location1 += Actual_Speed;
+			Location2 = Location1;
+			
+			// PID计算
+			Error2 = Error1;
+			Error1 = Error0;
+			Error0 = Target - Actual_Speed;
+			
+			Out += Kp * (Error0 - Error1) + Ki * Error0 + Kd * (Error0 - 2 * Error1 + Error2);
+			
+			// 输出限幅
+			if(Out > 100) Out = 100;
+			if(Out < -100) Out = -100;
+			
+			Motor1_SetPWM(Out);
+		}
+		
+        Key_Tick();  // 按键扫描
+        TIM_ClearITPendingBit(TIM1, TIM_IT_Update);
+    }
+}
