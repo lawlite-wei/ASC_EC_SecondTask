@@ -15,6 +15,7 @@ int16_t Speed1 = 0;        // 用于显示的转速
 int16_t Location1 = 0;
 int16_t Location2 = 0;
 int16_t Actual_Speed = 0; // 实际用于PID计算的速度
+int16_t Actual_Location = 0; // 实际用于PID计算的速度
 
 // 增量式PID变量
 float Target , Actual , Out ;
@@ -79,6 +80,8 @@ int main(void)
 // 定时器中断
 void TIM1_UP_IRQHandler(void)
 {
+	Key_Tick();  // 按键扫描
+	
 	static uint16_t Count = 0;
 	
     if (TIM_GetITStatus(TIM1, TIM_IT_Update) == SET)
@@ -88,27 +91,48 @@ void TIM1_UP_IRQHandler(void)
 		{
 			Count = 0;
 			
-			// 获取编码器值
-			Actual_Speed = Encoder1_Get();
-			Speed1 = Actual_Speed;  // 更新显示用的速度值
-			Location1 += Actual_Speed;
-			Location2 = Location1;
+			if(KeyNum == 1)
+			{
+				// 获取编码器值
+				Actual_Speed = Encoder1_Get();
+				Speed1 = Actual_Speed;  // 更新显示用的速度值
+				
+				// PID计算
+				Error2 = Error1;
+				Error1 = Error0;
+				Error0 = Target - Actual_Speed;
 			
-			// PID计算
-			Error2 = Error1;
-			Error1 = Error0;
-			Error0 = Target - Actual_Speed;
+				Out += Kp * (Error0 - Error1) + Ki * Error0 + Kd * (Error0 - 2 * Error1 + Error2);
 			
-			Out += Kp * (Error0 - Error1) + Ki * Error0 + Kd * (Error0 - 2 * Error1 + Error2);
+				// 输出限幅
+				if(Out > 100) Out = 100;
+				if(Out < -100) Out = -100;
 			
-			// 输出限幅
-			if(Out > 100) Out = 100;
-			if(Out < -100) Out = -100;
+				Motor1_SetPWM(Out);
+			}
 			
-			Motor1_SetPWM(Out);
+			if(KeyNum == 2)
+			{
+				//获取电机1的转动位置，并赋值到电机2的Target
+				Speed1 = Encoder1_Get();
+				Location1 += Speed1;
+				Target = Location1;
+				
+				//PID计算
+				Error2 = Error1;
+				Error1 = Error0;
+				Error0 = Target - Actual_Location;
+				
+				Out += Kp * (Error0 - Error1) + Ki * Error0 + Kd * (Error0 - 2 * Error1 + Error2);
+				
+				// 输出限幅
+				if(Out > 100) Out = 100;
+				if(Out < -100) Out = -100;
+				
+				Motor2_SetPWM(Out);
+			}
 		}
 		
-        Key_Tick();  // 按键扫描
         TIM_ClearITPendingBit(TIM1, TIM_IT_Update);
     }
 }
