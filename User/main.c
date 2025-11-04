@@ -11,20 +11,20 @@
 
 // 全局变量定义
 uint8_t KeyNum = 1;
-int16_t Speed1 = 0;        // 用于显示的转速
+uint8_t LastKeyNum = 1;  // 新增：记录上一次的菜单状态
+int16_t Speed1 = 0;        
 int16_t Location1 = 0;
 int16_t Location2 = 0;
-int16_t Actual_Speed = 0; // 实际用于PID计算的速度
-int16_t Actual_Location = 0; // 实际用于PID计算的速度
+int16_t Actual_Speed = 0; 
+int16_t Actual_Location = 0; 
 
 // 增量式PID变量
 float Target1 , Actual1 , Out1 ;
 float Target2 , Actual2 , Out2 ;
-float Kp1 = 0.5, Ki1 = 0.16, Kd1 = 0.5;
-float Kp2 = 0.4, Ki2 = 0.0, Kd2 = 0.0;
+float Kp1 = 0.52, Ki1 = 0.16, Kd1 = 0.15;
+float Kp2 = 0.5, Ki2 = 0.0, Kd2 = 0.0;
 float Error0_1 = 0, Error1_1 = 0, Error2_1 = 0;
 float Error0_2 = 0, Error1_2 = 0, Error2_2 = 0;
-
 
 int main(void)
 {
@@ -38,6 +38,7 @@ int main(void)
 	
 	// 初始显示菜单
 	menu_Speed();
+	LastKeyNum = KeyNum;  // 初始化上一次菜单状态
 	
 	while(1)
 	{
@@ -47,12 +48,38 @@ int main(void)
 			Target1 = Serial_SpeedValue;
 			Serial_Printf("New Target: %d\r\n", (int16_t)Target1);
 		}
+		
 		// 按键检测和菜单切换
 		if(Key_Check(KEY_3, KEY_DOWN)) 
 		{
 			KeyNum++;
 			if(KeyNum > 2) KeyNum = 1;
 			
+			// 菜单切换时停止电机1
+			if(LastKeyNum == 1 && KeyNum == 2)
+			{
+				// 从速度菜单切换到位置菜单时，停止电机1
+				Motor1_SetPWM(0);  // 停止电机1
+				Out1 = 0;          // 重置PID输出
+				Error0_1 = 0;      // 重置PID误差
+				Error1_1 = 0;
+				Error2_1 = 0;
+				Target1 = 0;       // 重置目标值
+			}
+			else if(LastKeyNum == 2 && KeyNum == 1)
+			{
+				// 从位置菜单切换到速度菜单时，停止电机2
+				Motor2_SetPWM(0);  // 停止电机2
+				Out2 = 0;          // 重置PID输出
+				Error0_2 = 0;      // 重置PID误差
+				Error1_2 = 0;
+				Error2_2 = 0;
+				Target2 = 0;       // 重置目标值
+				Location1 = 0;     // 重置位置计数
+				Location2 = 0;
+			}
+			
+			// 更新显示
 			if(KeyNum == 1)
 			{
 				menu_Speed();
@@ -61,23 +88,25 @@ int main(void)
 			{
 				menu_Location();
 			}
+			
+			LastKeyNum = KeyNum;  // 更新上一次菜单状态
 		}
 		
 		// 实时更新OLED显示
 		if(KeyNum == 1)  // 速度菜单
 		{
-			OLED_ShowSignedNum(2, 5, (int16_t)Target1, 5);  // 显示目标值
-			OLED_ShowSignedNum(3, 5, Speed1, 5);            // 显示实际速度
-			OLED_ShowSignedNum(4, 5, (int16_t)Out1, 5);     // 显示输出
-			Serial_Printf("Target:%.1f, Speed:%d, Out:%.1f\r\n", Target1, Speed1, Out1);
+			OLED_ShowSignedNum(2, 5, (int16_t)Target1, 5);  
+			OLED_ShowSignedNum(3, 5, Speed1, 5);            
+			OLED_ShowSignedNum(4, 5, (int16_t)Out1, 5);     
+			Serial_Printf("%.1f, %d, 	%.1f\r\n", Target1, Speed1, Out1);
 		}
 		else if(KeyNum == 2)  // 位置菜单
 		{
-			OLED_ShowSignedNum(2, 8, Location1, 5);         // 显示位置
+			OLED_ShowSignedNum(2, 8, Location1, 5);         
 			OLED_ShowSignedNum(3, 8, Location2, 5);
 		}
 		
-		Delay_ms(50);  // 适当延时
+		Delay_ms(50);  
 	}
 }
 
@@ -99,7 +128,7 @@ void TIM1_UP_IRQHandler(void)
 			{
 				// 获取编码器值
 				Actual_Speed = Encoder1_Get();
-				Speed1 = Actual_Speed;  // 更新显示用的速度值
+				Speed1 = Actual_Speed;  
 				
 				// PID计算
 				Error2_1 = Error1_1;
