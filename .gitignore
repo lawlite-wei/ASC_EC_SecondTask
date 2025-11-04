@@ -1,3 +1,10 @@
+#Keil MDK项目文件
+*.uvguix.*
+*.uvoptx.*
+*.uvprojx.*
+objects/*.htm
+objects/*.dep
+
 1.uvguix.lwqxb
 1.uvoptx
 1.uvprojx
