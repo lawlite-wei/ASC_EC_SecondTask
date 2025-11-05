@@ -1,21 +1,33 @@
-# Keil MDK Project Files
+# Keil MDK 项目文件
 *.uvguix.*
-*.uvoptx.*
-*.uvprojx.*
+*.uvoptx
+*.uvprojx
 
-# Keil MDK Build Output
-objects/*.htm
-objects/*.dep
+# Keil MDK 构建输出
+*.build_log.htm
+*.lnp
+*.lst
+*.map
+*.dep
 
-# Keil MDK User-specific
+# Keil MDK 用户特定文件
 *.bak
 *.log
-*.lst
 *.plg
 *.mpu
 *.tra
+*.crf
+*.d
+*.axf
+*.iex
 
-# Specific numbered files (if needed)
-1.uvguix.lwqxb
+# 编译输出文件
+*.o
+*.d
+*.i
+*.s
+
+# 特定版本文件
+1.uvguix.*
 1.uvoptx
 1.uvprojx
